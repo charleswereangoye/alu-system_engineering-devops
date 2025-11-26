@@ -1,21 +1,29 @@
 #!/usr/bin/env bash
-# Installs Nginx and configures custom pages and headers
+# Installs Nginx and configures custom pages and headers on multiple servers
 
-# Update and install Nginx
-sudo apt-get update
-sudo apt-get install -y nginx
+# List of servers
+servers=("web-01" "web-02")
 
-# Create index.html
-echo "Holberton School" | sudo tee /var/www/html/index.html
+# Loop through each server
+for server in "${servers[@]}"; do
+  echo "Configuring $server..."
 
-# Create custom 404 page
-echo "Ceci n'est pas une page" | sudo tee /var/www/html/404.html
+  ssh ubuntu@"$server" bash -s <<'EOF'
+    # Update and install Nginx
+    sudo apt-get update
+    sudo apt-get install -y nginx
 
-# Backup default Nginx config
-sudo cp /etc/nginx/sites-available/default /etc/nginx/sites-available/default.bak
+    # Create index.html
+    echo "Holberton School" | sudo tee /var/www/html/index.html
 
-# Replace the default server block with the proper configuration
-sudo tee /etc/nginx/sites-available/default > /dev/null <<'EOF'
+    # Create custom 404 page
+    echo "Ceci n'est pas une page" | sudo tee /var/www/html/404.html
+
+    # Backup default Nginx config
+    sudo cp /etc/nginx/sites-available/default /etc/nginx/sites-available/default.bak
+
+    # Overwrite default Nginx config
+    sudo tee /etc/nginx/sites-available/default > /dev/null <<'NGINXCONF'
 server {
     listen 80 default_server;
     listen [::]:80 default_server;
@@ -44,10 +52,14 @@ server {
         internal;
     }
 }
+NGINXCONF
+
+    # Test Nginx configuration
+    sudo nginx -t
+
+    # Restart Nginx to apply changes
+    sudo systemctl restart nginx
 EOF
 
-# Test Nginx configuration
-sudo nginx -t
-
-# Restart Nginx to apply changes
-sudo systemctl restart nginx
+  echo "$server configured successfully!"
+done
