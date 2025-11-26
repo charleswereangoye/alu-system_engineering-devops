@@ -1,28 +1,50 @@
 #!/usr/bin/env bash
 # Installs Nginx with the following configurations:
-#+    Listens on port 80.
-#+    Returns a page containing "Holberton School" when queried
-#+     at the root with a curl GET request.
-# Configures /redirect_me as a "301 Moved Permanently".
-# Includes a custom 404 page containing "Ceci n'est pas une page".
+#  - Listens on port 80.
+#  - Returns a page containing "Holberton School" at the root.
+#  - Configures /redirect_me as a "301 Moved Permanently".
+#  - Includes a custom 404 page containing "Ceci n'est pas une page".
+#  - Adds a custom header X-Served-By with the hostname.
 
-sudo apt-get update 
-sudo apt-get install -y nginx 
+# Exit on errors
+set -e
 
-echo "Holberton School" | sudo tee /var/www/html/index.html
+# Update and install Nginx
+apt-get update -y
+apt-get install -y nginx
 
-string_for_replacement="server_name _;\n\trewrite ^\/redirect_me https:\/\/www.youtube.com\/watch?v=QH2-TGUlwu4 permanent;"
+# Define hostname variable
+HOSTNAME=$(hostname)
 
-sudo sed -i "s/server_name _;/$string_for_replacement/" /etc/nginx/sites-available/default
+# Create the index page
+echo "Holberton School" > /var/www/html/index.html
 
-echo "Ceci n'est pas une page" | sudo tee /var/www/html/404.html
+# Create 404 page
+echo "Ceci n'est pas une page" > /var/www/html/404.html
 
-string_for_replacement="listen 80 default_server;\n\terror_page 404 \/404.html;\n\tlocation = \/404.html {\n\t\troot \/var\/www\/html;\n\tinternal;\n\t}"
+# Backup default config
+CONFIG="/etc/nginx/sites-available/default"
+if [ ! -f "${CONFIG}.bak" ]; then
+    cp $CONFIG "${CONFIG}.bak"
+fi
 
-sudo sed -i "s/listen 80 default_server;/$string_for_replacement/" /etc/nginx/sites-available/default
+# Configure /redirect_me 301
+if ! grep -q "rewrite ^/redirect_me" $CONFIG; then
+    sed -i "/server_name _;/a \    rewrite ^/redirect_me https://www.youtube.com/watch?v=QH2-TGUlwu4 permanent;" $CONFIG
+fi
 
-sudo sed -i "/server_name _;/a add_header X-Served-By $HOSTNAME;" /etc/nginx/sites-available/default
+# Configure custom 404 page
+if ! grep -q "location = /404.html" $CONFIG; then
+    sed -i "/listen 80 default_server;/a \    error_page 404 /404.html;\n    location = /404.html {\n        root /var/www/html;\n        internal;\n    }" $CONFIG
+fi
 
-sudo nginx -t
+# Add X-Served-By header if not already present
+if ! grep -q "X-Served-By" $CONFIG; then
+    sed -i "/server_name _;/a \    add_header X-Served-By $HOSTNAME;" $CONFIG
+fi
 
-sudo service nginx restart
+# Test Nginx config
+nginx -t
+
+# Restart Nginx
+systemctl restart nginx
