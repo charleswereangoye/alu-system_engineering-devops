@@ -1,49 +1,44 @@
 #!/usr/bin/env bash
-# Installs Nginx with the following configurations:
-#  - Listens on port 80.
-#  - Returns a page containing "Holberton School" at the root.
-#  - Configures /redirect_me as a "301 Moved Permanently".
-#  - Includes a custom 404 page containing "Ceci n'est pas une page".
-#  - Adds a custom header X-Served-By with the hostname.
+# Configures a new Ubuntu server to meet the project requirements
+#  - Installs Nginx
+#  - Adds X-Served-By header
+#  - Adds custom index, redirect, and 404 page
 
-# Exit on errors
 set -e
 
 # Update and install Nginx
 apt-get update -y
 apt-get install -y nginx
 
-# Define hostname variable
+# Hostname for the header
 HOSTNAME=$(hostname)
 
-# Create the index page
+# Set up the web pages
 echo "Holberton School" > /var/www/html/index.html
-
-# Create 404 page
 echo "Ceci n'est pas une page" > /var/www/html/404.html
 
-# Backup default config
+# Backup default Nginx config if not already
 CONFIG="/etc/nginx/sites-available/default"
 if [ ! -f "${CONFIG}.bak" ]; then
     cp $CONFIG "${CONFIG}.bak"
 fi
 
-# Configure /redirect_me 301
+# Add redirect for /redirect_me if missing
 if ! grep -q "rewrite ^/redirect_me" $CONFIG; then
     sed -i "/server_name _;/a \    rewrite ^/redirect_me https://www.youtube.com/watch?v=QH2-TGUlwu4 permanent;" $CONFIG
 fi
 
-# Configure custom 404 page
+# Add custom 404 page if missing
 if ! grep -q "location = /404.html" $CONFIG; then
     sed -i "/listen 80 default_server;/a \    error_page 404 /404.html;\n    location = /404.html {\n        root /var/www/html;\n        internal;\n    }" $CONFIG
 fi
 
-# Add X-Served-By header if not already present
-if ! grep -q "X-Served-By" $CONFIG; then
+# Add X-Served-By header if missing
+if ! grep -q "add_header X-Served-By" $CONFIG; then
     sed -i "/server_name _;/a \    add_header X-Served-By $HOSTNAME;" $CONFIG
 fi
 
-# Test Nginx config
+# Test Nginx configuration
 nginx -t
 
 # Restart Nginx
