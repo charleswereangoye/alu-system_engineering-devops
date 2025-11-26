@@ -1,65 +1,28 @@
 #!/usr/bin/env bash
-# Installs Nginx and configures custom pages and headers on multiple servers
+# Installs Nginx with the following configurations:
+#+    Listens on port 80.
+#+    Returns a page containing "Holberton School" when queried
+#+     at the root with a curl GET request.
+# Configures /redirect_me as a "301 Moved Permanently".
+# Includes a custom 404 page containing "Ceci n'est pas une page".
 
-# List of servers
-servers=("54.84.15.122" "3.87.208.156")
+sudo apt-get update 
+sudo apt-get install -y nginx 
 
-# Loop through each server
-for server in "${servers[@]}"; do
-  echo "Configuring $server..."
+echo "Holberton School" | sudo tee /var/www/html/index.html
 
-  ssh ubuntu@"$server" bash -s <<'EOF'
-    # Update and install Nginx
-    sudo apt-get update
-    sudo apt-get install -y nginx
+string_for_replacement="server_name _;\n\trewrite ^\/redirect_me https:\/\/www.youtube.com\/watch?v=QH2-TGUlwu4 permanent;"
 
-    # Create index.html
-    echo "Holberton School" | sudo tee /var/www/html/index.html
+sudo sed -i "s/server_name _;/$string_for_replacement/" /etc/nginx/sites-available/default
 
-    # Create custom 404 page
-    echo "Ceci n'est pas une page" | sudo tee /var/www/html/404.html
+echo "Ceci n'est pas une page" | sudo tee /var/www/html/404.html
 
-    # Backup default Nginx config
-    sudo cp /etc/nginx/sites-available/default /etc/nginx/sites-available/default.bak
+string_for_replacement="listen 80 default_server;\n\terror_page 404 \/404.html;\n\tlocation = \/404.html {\n\t\troot \/var\/www\/html;\n\tinternal;\n\t}"
 
-    # Overwrite default Nginx config
-    sudo tee /etc/nginx/sites-available/default > /dev/null <<'NGINXCONF'
-server {
-    listen 80 default_server;
-    listen [::]:80 default_server;
+sudo sed -i "s/listen 80 default_server;/$string_for_replacement/" /etc/nginx/sites-available/default
 
-    root /var/www/html;
-    index index.html;
+sudo sed -i "/server_name _;/a add_header X-Served-By $HOSTNAME;" /etc/nginx/sites-available/default
 
-    server_name _;
+sudo nginx -t
 
-    # Custom header
-    add_header X-Served-By $HOSTNAME;
-
-    # Redirect /redirect_me permanently
-    location = /redirect_me {
-        return 301 https://www.youtube.com/watch?v=QH2-TGUlwu4;
-    }
-
-    # Default location
-    location / {
-        try_files $uri $uri/ =404;
-    }
-
-    # Custom 404 page
-    error_page 404 /404.html;
-    location = /404.html {
-        internal;
-    }
-}
-NGINXCONF
-
-    # Test Nginx configuration
-    sudo nginx -t
-
-    # Restart Nginx to apply changes
-    sudo systemctl restart nginx
-EOF
-
-  echo "$server configured successfully!"
-done
+sudo service nginx restart
