@@ -1,45 +1,28 @@
 #!/usr/bin/env bash
-# Configures a new Ubuntu server to meet the project requirements
-#  - Installs Nginx
-#  - Adds X-Served-By header
-#  - Adds custom index, redirect, and 404 page
+# Installs Nginx with the following configurations:
+#+    Listens on port 80.
+#+    Returns a page containing "Holberton School" when queried
+#+     at the root with a curl GET request.
+# Configures /redirect_me as a "301 Moved Permanently".
+# Includes a custom 404 page containing "Ceci n'est pas une page".
 
-set -e
+sudo apt-get update 
+sudo apt-get install -y nginx 
 
-# Update and install Nginx
-apt-get update -y
-apt-get install -y nginx
+echo "Holberton School" | sudo tee /var/www/html/index.html
 
-# Hostname for the header
-HOSTNAME=$(hostname)
+string_for_replacement="server_name _;\n\trewrite ^\/redirect_me https:\/\/www.youtube.com\/watch?v=QH2-TGUlwu4 permanent;"
 
-# Set up the web pages
-echo "Holberton School" > /var/www/html/index.html
-echo "Ceci n'est pas une page" > /var/www/html/404.html
+sudo sed -i "s/server_name _;/$string_for_replacement/" /etc/nginx/sites-available/default
 
-# Backup default Nginx config if not already
-CONFIG="/etc/nginx/sites-available/default"
-if [ ! -f "${CONFIG}.bak" ]; then
-    cp $CONFIG "${CONFIG}.bak"
-fi
+echo "Ceci n'est pas une page" | sudo tee /var/www/html/404.html
 
-# Add redirect for /redirect_me if missing
-if ! grep -q "rewrite ^/redirect_me" $CONFIG; then
-    sed -i "/server_name _;/a \    rewrite ^/redirect_me https://www.youtube.com/watch?v=QH2-TGUlwu4 permanent;" $CONFIG
-fi
+string_for_replacement="listen 80 default_server;\n\terror_page 404 \/404.html;\n\tlocation = \/404.html {\n\t\troot \/var\/www\/html;\n\tinternal;\n\t}"
 
-# Add custom 404 page if missing
-if ! grep -q "location = /404.html" $CONFIG; then
-    sed -i "/listen 80 default_server;/a \    error_page 404 /404.html;\n    location = /404.html {\n        root /var/www/html;\n        internal;\n    }" $CONFIG
-fi
+sudo sed -i "s/listen 80 default_server;/$string_for_replacement/" /etc/nginx/sites-available/default
 
-# Add X-Served-By header if missing
-if ! grep -q "add_header X-Served-By" $CONFIG; then
-    sed -i "/server_name _;/a \    add_header X-Served-By $HOSTNAME;" $CONFIG
-fi
+sudo sed -i "/server_name _;/a add_header X-Served-By $HOSTNAME;" /etc/nginx/sites-available/default
 
-# Test Nginx configuration
-nginx -t
+sudo nginx -t
 
-# Restart Nginx
-systemctl restart nginx
+sudo service nginx restart
