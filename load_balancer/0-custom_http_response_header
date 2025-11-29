@@ -54,7 +54,7 @@ server_config='server {
 
     server_name _;
 
-    add_header X-Served-By $hostname;
+    add_header X-Served-By $HOSTNAME;
 
     location / {
         try_files $uri $uri/ =404;
